@@ -1,32 +1,31 @@
-
 import { createClient } from "@libsql/client";
 import { NextResponse } from "next/server";
 
+const PASSWORD = "JekkLiqoOqD";
+
 const db = createClient({
-    url: process.env.TURSO_DATABASE_URL,
-    authToken: process.env.TURSO_AUTH_TOKEN
+    url: process.env.TURSO_DATABASE_URL!,
+    authToken: process.env.TURSO_AUTH_TOKEN!,
 });
 
 let initialized = false;
 
 async function init() {
     if (initialized) return;
-
     await db.execute(`
         CREATE TABLE IF NOT EXISTS pending (
             id TEXT PRIMARY KEY,
             created_at INTEGER NOT NULL
         )
     `);
-
     initialized = true;
 }
 
-function authorized(req) {
-    return req.headers.get("authorization") === `Bearer ${process.env.WORKER_SECRET}`;
+function authorized(req: Request) {
+    return req.headers.get("authorization") === `Bearer ${PASSWORD}`;
 }
 
-export async function GET(req, { params }) {
+export async function GET(req: Request, { params }: { params: Promise<{ path?: string[] }> }) {
     await init();
 
     const { path = [] } = await params;
@@ -40,7 +39,7 @@ export async function GET(req, { params }) {
     }
 
     if (path[0] === "api" && path[1] === "dashboard") {
-        if (url.searchParams.get("dec") !== process.env.BLACKLIST_PASSWORD)
+        if (url.searchParams.get("dec") !== PASSWORD)
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const result = await db.execute("SELECT id, created_at FROM pending ORDER BY created_at DESC");
@@ -48,7 +47,7 @@ export async function GET(req, { params }) {
     }
 
     if (path[0] === "blacklist" && path[1] === "add") {
-        if (url.searchParams.get("dec") !== process.env.BLACKLIST_PASSWORD)
+        if (url.searchParams.get("dec") !== PASSWORD)
             return new Response("Unauthorized", { status: 401 });
 
         const result = await db.execute("SELECT id, created_at FROM pending ORDER BY created_at DESC");
@@ -67,7 +66,7 @@ export async function GET(req, { params }) {
     if (path[0] === "blacklist" && path[1] && path[1] !== "add") {
         const id = path[1];
 
-        if (!/^\d{17,20}$/.test(id) || url.searchParams.get("dec") !== process.env.BLACKLIST_PASSWORD)
+        if (!/^\d{17,20}$/.test(id) || url.searchParams.get("dec") !== PASSWORD)
             return new Response("Invalid link", { status: 401 });
 
         return new Response(`
@@ -78,7 +77,7 @@ export async function GET(req, { params }) {
                     <p>${id}</p>
                     <form method="POST" action="/api/submit">
                         <input type="hidden" name="id" value="${id}">
-                        <input type="hidden" name="dec" value="${process.env.BLACKLIST_PASSWORD}">
+                        <input type="hidden" name="dec" value="${PASSWORD}">
                         <button style="padding:12px 30px;cursor:pointer">Confirm</button>
                     </form>
                 </div>
@@ -90,7 +89,7 @@ export async function GET(req, { params }) {
     return new Response("Not found", { status: 404 });
 }
 
-export async function POST(req, { params }) {
+export async function POST(req: Request, { params }: { params: Promise<{ path?: string[] }> }) {
     await init();
 
     const { path = [] } = await params;
@@ -100,13 +99,12 @@ export async function POST(req, { params }) {
         const id = form.get("id");
         const dec = form.get("dec");
 
-        if (typeof id !== "string" || !/^\d{17,20}$/.test(id) ||
-            dec !== process.env.BLACKLIST_PASSWORD)
+        if (typeof id !== "string" || !/^\d{17,20}$/.test(id) || dec !== PASSWORD)
             return new Response("Unauthorized", { status: 401 });
 
         await db.execute({
             sql: "INSERT OR IGNORE INTO pending (id, created_at) VALUES (?, ?)",
-            args: [id, Date.now()]
+            args: [id, Date.now()],
         });
 
         return new Response(`
@@ -122,7 +120,7 @@ export async function POST(req, { params }) {
 
         const { ids } = await req.json();
 
-        if (!Array.isArray(ids) || ids.length > 100 || !ids.every(id => typeof id === "string" && /^\d{17,20}$/.test(id)))
+        if (!Array.isArray(ids) || ids.length > 100 || !ids.every((id: unknown) => typeof id === "string" && /^\d{17,20}$/.test(id)))
             return NextResponse.json({ error: "Invalid IDs" }, { status: 400 });
 
         for (const id of ids) {
