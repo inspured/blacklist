@@ -1,0 +1,15 @@
+
+{
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "worker": "node --env-file=.env worker.js"
+    },
+    "dependencies": {
+        "@libsql/client": "^0.15.0",
+        "next": "^15.5.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
+    }
+}
