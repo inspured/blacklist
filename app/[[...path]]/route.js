@@ -5,27 +5,29 @@ const PASSWORD = "JekkLiqoOqD";
 
 const db = createClient({
     url: process.env.TURSO_DATABASE_URL,
-    authToken: process.env.TURSO_AUTH_TOKEN,
+    authToken: process.env.TURSO_AUTH_TOKEN
 });
 
 let initialized = false;
 
 async function init() {
     if (initialized) return;
+
     await db.execute(`
         CREATE TABLE IF NOT EXISTS pending (
             id TEXT PRIMARY KEY,
             created_at INTEGER NOT NULL
         )
     `);
+
     initialized = true;
 }
 
-function authorized(req: Request) {
+function authorized(req) {
     return req.headers.get("authorization") === `Bearer ${PASSWORD}`;
 }
 
-export async function GET(req: Request, { params }: { params: Promise<{ path?: string[] }> }) {
+export async function GET(req, { params }) {
     await init();
 
     const { path = [] } = await params;
@@ -89,7 +91,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ path?: s
     return new Response("Not found", { status: 404 });
 }
 
-export async function POST(req: Request, { params }: { params: Promise<{ path?: string[] }> }) {
+export async function POST(req, { params }) {
     await init();
 
     const { path = [] } = await params;
@@ -99,12 +101,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ path?: 
         const id = form.get("id");
         const dec = form.get("dec");
 
-        if (typeof id !== "string" || !/^\d{17,20}$/.test(id) || dec !== PASSWORD)
+        if (typeof id !== "string" || !/^\d{17,20}$/.test(id) ||
+            dec !== PASSWORD)
             return new Response("Unauthorized", { status: 401 });
 
         await db.execute({
             sql: "INSERT OR IGNORE INTO pending (id, created_at) VALUES (?, ?)",
-            args: [id, Date.now()],
+            args: [id, Date.now()]
         });
 
         return new Response(`
@@ -120,7 +123,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ path?: 
 
         const { ids } = await req.json();
 
-        if (!Array.isArray(ids) || ids.length > 100 || !ids.every((id: unknown) => typeof id === "string" && /^\d{17,20}$/.test(id)))
+        if (!Array.isArray(ids) || ids.length > 100 || !ids.every(id => typeof id === "string" && /^\d{17,20}$/.test(id)))
             return NextResponse.json({ error: "Invalid IDs" }, { status: 400 });
 
         for (const id of ids) {
