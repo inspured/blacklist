@@ -18,6 +18,12 @@ async function init() {
             created_at INTEGER NOT NULL
         )
     `);
+    await db.execute(`
+        CREATE TABLE IF NOT EXISTS pending_unblacklist (
+            id TEXT PRIMARY KEY,
+            created_at INTEGER NOT NULL
+        )
+    `);
     initialized = true;
 }
 
@@ -35,6 +41,13 @@ export async function GET(req, { params }) {
         if (!authorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const result = await db.execute("SELECT id FROM pending ORDER BY created_at ASC");
+        return NextResponse.json({ pending: result.rows.map(row => row.id) });
+    }
+
+    if (path[0] === "api" && path[1] === "pending-unblacklist") {
+        if (!authorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const result = await db.execute("SELECT id FROM pending_unblacklist ORDER BY created_at ASC");
         return NextResponse.json({ pending: result.rows.map(row => row.id) });
     }
 
@@ -78,7 +91,10 @@ export async function GET(req, { params }) {
         if (!/^\d{17,20}$/.test(id) || url.searchParams.get("dec") !== PASSWORD)
             return new Response("Invalid link", { status: 401 });
 
-        await db.execute({ sql: "DELETE FROM pending WHERE id = ?", args: [id] });
+        await db.execute({
+            sql: "INSERT OR IGNORE INTO pending_unblacklist (id, created_at) VALUES (?, ?)",
+            args: [id, Date.now()]
+        });
 
         return new Response("you can close this now", {
             headers: { "Content-Type": "text/plain" }
@@ -103,6 +119,7 @@ export async function POST(req, { params }) {
 
         for (const id of ids) {
             await db.execute({ sql: "DELETE FROM pending WHERE id = ?", args: [id] });
+            await db.execute({ sql: "DELETE FROM pending_unblacklist WHERE id = ?", args: [id] });
         }
 
         return NextResponse.json({ success: true });
