@@ -67,8 +67,21 @@ export async function GET(req, { params }) {
             args: [id, Date.now()]
         });
 
-        return new Response(`<html><body><script>window.close()</script></body></html>`, {
-            headers: { "Content-Type": "text/html" }
+        return new Response("you can close this now", {
+            headers: { "Content-Type": "text/plain" }
+        });
+    }
+
+    if (path[0] === "unblacklist" && path[1]) {
+        const id = path[1];
+
+        if (!/^\d{17,20}$/.test(id) || url.searchParams.get("dec") !== PASSWORD)
+            return new Response("Invalid link", { status: 401 });
+
+        await db.execute({ sql: "DELETE FROM pending WHERE id = ?", args: [id] });
+
+        return new Response("you can close this now", {
+            headers: { "Content-Type": "text/plain" }
         });
     }
 
